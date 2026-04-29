@@ -17,6 +17,7 @@ PROCEDURE wlogon
 	#define LOGON32_LOGON_BATCH             4
 	#define LOGON32_LOGON_SERVICE           5
 	#define LOGON32_LOGON_UNLOCK            7
+	#define LOGON32_LOGON_NEW_CREDENTIALS   9
 	DECLARE integer LogonUser IN AdvApi32.DLL;
 	string szUsername,;
 	string lpszDomain,;
@@ -28,7 +29,8 @@ PROCEDURE wlogon
 	DECLARE integer CloseHandle IN kernel32.DLL integer hToken
 	local nToken
 	nToken = 0
-	=LogonUser(xuser,xdomain,xpassword,LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, @nToken)
+	**=LogonUser(xuser,xdomain,xpassword,LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, @nToken)
+	=LogonUser(xuser,xdomain,xpassword,LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_DEFAULT, @nToken)
 	IF ntoken=0
 	   RETURN .f.
 	else   

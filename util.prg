@@ -1,5 +1,46 @@
 SET PROCEDURE TO windowslogon.prg
 
+
+Procedure getPathyeni(firma,yer)
+    _BoyutDrive=""
+    _BoyutPath=""
+    DO CASE
+        CASE firma="local"
+            * (Local kýsmý ayný kalýyor)
+            a = wlogon("um1","\\192.168.239.128","123456")
+            IF yer="boyut" then 
+                _BoyutDrive="\\192.168.239.128\Boyut\"
+                RETURN _BoyutDrive
+            ELSE
+                _BoyutPath="\\192.168.239.128\Boyut\data\"
+                RETURN _BoyutPath
+            ENDIF 
+
+        CASE firma="selcuk" 
+            * 1. AKILLI KONTROL: Zaten baðlý mýyýz?
+            IF DIRECTORY("\\BSERVER\BOYUTC\SELDATA")
+                * Kapý zaten açýk! Yeniden Logon (Kýlýk Deðiþtirme) yapmaya gerek yok.
+                * Ýstersen buraya logYaz() ekleyip "Logon atlandi" diye takip edebilirsin.
+            ELSE 
+                * Kapý kapalý. O zaman mecburen kýlýk deðiþtirip (um1) girmeyi deniyoruz.
+                a = wlogon("um1","\\BSERVER","123456")
+            ENDIF
+
+            * 2. Yollarý Döndür
+            IF yer="boyut"
+                _BoyutDrive="\\BSERVER\BOYUTC\"
+                RETURN _BoyutDrive
+            ELSE 
+                _BoyutPath="\\BSERVER\BOYUTC\SELDATA\"
+                RETURN _BoyutPath
+            ENDIF 
+
+    ENDCASE 
+    
+    return "olmadý"     
+ENDPROC
+
+
 Procedure getPath(firma,yer)
 		_BoyutDrive=""
 		_BoyutPath=""

@@ -7,11 +7,10 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	HIDDEN KLASOR
 	HIDDEN _CEPNO
 	HIDDEN _SUBENO
+	HIDDEN _DEPOADI
 	
 **------------------------------------------------------------------------------------------------------------------------------	
 	PROCEDURE definePaths
-		**this.STKPATH = getPath("local","data")
-		**this.BPATH	= getpath("local","boyut")
 		
 		this.STKPATH = getPath("selcuk","data")
 		this.BPATH	= getpath("selcuk","boyut")
@@ -21,9 +20,21 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		RESTORE FROM &BPATH.KLASOR.mem ADDITIVE 
 		this.KLASOR = BPATH+klasor
 				
-		RESTORE FROM &BPATH.subeno.mem ADDITIVE 
-		this._CEPNO = _CEPNO
+		RESTORE FROM &BPATH.SUBENO.mem ADDITIVE 
+		IF TYPE("_CEPNO") = "U" OR EMPTY(_CEPNO)            
+			this._CEPNO = "01"        
+		ELSE            
+			this._CEPNO = _CEPNO        
+		ENDIF
 		this._SUBENO = SUBENO
+		
+		RESTORE FROM &BPATH.memfile.mem ADDITIVE
+		IF TYPE("DEPOADI") = "U" OR EMPTY(DEPOADI)            
+			this._DEPOADI = "Boyut"        
+		ELSE            
+			this._DEPOADI = DEPOADI
+		ENDIF
+		
 		
 		**wlogout()
 		RETURN
@@ -75,9 +86,10 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	            	ENDIF 
 	            	IF EMPTY(sevksaati) 
 	            	**.and. FOUND() then 
-	            		JSONmetin = JSONmetin+"{'ftrrec':'"+STR(RECNO("ftrrpr"))+"',"
+	            		JSONmetin = JSONmetin+"{'ftrrec':'"+LTRIM(STR(RECNO("ftrrpr")))+"',"
 	            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
 	            		JSONmetin = JSONmetin+"'adi':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
+	            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
 	            		JSONmetin = JSONmetin+"'semt':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
 	            		JSONmetin = JSONmetin+"'sehir':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
 	            		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
@@ -103,7 +115,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	            			CONTINUE 
 	            		ENDDO 
 	            		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-	            		JSONmetin = JSONmetin + "'sepetler':'"+sepetstr+"'},"
+	            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'},"
 	            		b=b+1
 	            	ENDIF 	
 	            ENDIF					
@@ -126,8 +138,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		SELECT ftrrpr
 		JSONmetin = "["
 		IF ftrrpr.bolge $ okunanBolgeNo THEN 
-			ftno=iif(ftnovar,ftrrpr->faturano ,STR(ftrrpr->no1,7))
-			SELECT c100
+				ftno=iif(ftnovar,ftrrpr->faturano ,STR(ftrrpr->no1,7))
+				SELECT c100
 				SET ORDER TO 1
 				SEEK ftrrpr.eczanekodu
 				IF FOUND() THEN
@@ -136,9 +148,10 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 					SEEK ftno
 					LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih.and.eczanekodu=ftrrpr.eczanekodu
 					IF EMPTY(sevksaati) .and. FOUND() THEN 
-						JSONmetin = JSONmetin+"{'ftrrec':'"+STR(RECNO("ftrrpr"))+"',"
+						JSONmetin = JSONmetin+"{'ftrrec':'"+RTRIM(LTRIM(STR(RECNO("ftrrpr"))))+"',"
 	            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
 	            		JSONmetin = JSONmetin+"'adi':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
+	            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
 	            		JSONmetin = JSONmetin+"'semt':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
 	            		JSONmetin = JSONmetin+"'sehir':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
 	            		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
@@ -166,25 +179,25 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	            			CONTINUE 
 	            		ENDDO 
 	            		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-	            		JSONmetin = JSONmetin + "'sepetler':'"+sepetstr+"'}]"
+	            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'}]"
 	              ELSE
               	
-					JSONmetin = JSONmetin+"{'ftrrec':'"+STR(RECNO("ftrrpr"))+"',"
+					JSONmetin = JSONmetin + "{'ftrrec':'" + TRANSFORM(RECNO("ftrrpr")) + "',"
             		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
             		JSONmetin = JSONmetin+"'adi':'"+CPCONVERT(857,1254,c100.adi)+"',"
+            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
             		JSONmetin = JSONmetin+"'semt':'"+CPCONVERT(857,1254,c100.semt)+"',"
             		JSONmetin = JSONmetin+"'sehir':'"+CPCONVERT(857,1254,c100.sehir)+"',"
             		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
             		JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
             		JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
-            		
-					
+     					
             		slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="","",TexttoLong(ftrrpr.sevklistno)))
             		**RETURN TRANSFORM(sepetirsrecno)
             		JSONmetin = JSONmetin+"'sevklistno':'"+slistno+"',"
             		SET DELETED OFF 
 	              	SELECT irsrpr
-	              	IF RECCOUNT()>sepetirsrecno THEN 
+	              	IF TYPE("sepetirsrecno") != "U" .AND. RECCOUNT()>sepetirsrecno THEN 
 		              	GO sepetirsrecno
 	            		JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(irsrpr.kolisay))+"',"
 	            		JSONmetin = JSONmetin+"'posetsay':'"+LTRIM(STR(irsrpr.posetsay))+"',"
@@ -217,7 +230,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
             			CONTINUE 
             		ENDDO 
             		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-            		JSONmetin = JSONmetin + "'sepetler':'"+sepetstr+"'}]"
+            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'}]"
 	              	SET DELETED ON 
 		          	
 				  ENDIF 
@@ -237,7 +250,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		USE &STKPATH.sevklist SHARED
 		SET ORDER TO 3 desc
 		SEEK plkNo
-		LOCATE WHILE plakano = plkNo FOR donustarih<CTOD("1/1/1") .and. sevktarihi>DATE()-2
+		LOCATE WHILE plakano = plkNo FOR donustarih<CTOD("1/1/1") 
+		**.and. sevktarihi>DATE()-2
 		IF FOUND() then
 			REPLACE donustarih WITH DATE(), donussaati WITH TIME(1)
 			RETURN "true" 
@@ -245,6 +259,150 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 			RETURN "false"
 		ENDIF 
 	ENDPROC 
+	
+
+**------------------------------------------------------------------------------------------------------------------------------	
+** Çýkýþ Yapmýþ Plakanýn Kaldýðý Yerden Devam Etmesi Ýçin Verileri Getirir
+	PROCEDURE PlakaKaldigiYerdenGetir(plkNo)
+		this.definePaths()
+		BPATH = this.BPATH
+		STKPATH = this.STKPATH
+		KLASOR = this.KLASOR
+
+		** 1. AKTÝF SEVK LÝSTESÝNÝ BUL
+		USE &STKPATH.sevklist SHARED
+		SELECT 0
+		SELECT sevklist
+		
+		* Ýndekse (SEEK) güvenmiyoruz, boþluklarý silerek tam eþleþme ve "dönüþü boþ (aktif)" kontrolü yapýyoruz:
+		LOCATE FOR ALLTRIM(plakano) == ALLTRIM(plkNo) .and. EMPTY(donustarih)
+		
+		IF !FOUND()
+			wlogout()
+			RETURN "false"
+		ENDIF
+		
+		** --- YENÝ: 3 GÜN KONTROLÜ ---
+		** DATE() - sevktarihi iþleminin sonucu gün farkýný verir
+		IF (DATE() - sevklist.sevktarihi) > 3
+			wlogout()
+			RETURN "eskisevkiyat"
+		ENDIF
+		
+		** ----------------------------
+		aktifSevkNo = sevklist.sevklistno
+		
+		** TABLOLARI AÇ
+		IF FILE(STKPATH+"sepet.dbf")
+		   USE &STKPATH.sepet SHARED
+		ELSE
+		   USE &STKPATH.sepetler ALIAS sepet SHARED
+		ENDIF
+		SELECT 0
+
+		IF "SELDATA" $ this.STKPATH THEN 
+			USE &STKPATH.c100 SHARED
+		    if empty(cdx(1))
+		      set index to &STKPATH.c110
+		    endif
+		    set order to 1 
+		    SELECT 0
+		ELSE
+			USE &KLASOR.c100 SHARED
+		    if empty(cdx(1))
+		      set index to &KLASOR.c110
+		    endif
+		    set order to 1 
+		    SELECT 0
+		ENDIF 
+
+		USE &STKPATH.ftrcikis SHARED
+		SET ORDER TO 1
+		SELECT 0
+
+		USE &STKPATH.ftrrpr SHARED
+		IF EMPTY(CDX(1))
+		   SET INDEX TO &STKPATH.iftrrpr, &STKPATH.iftrrprk, &STKPATH.iftrrprt
+		ENDIF
+		SET ORDER TO 0
+		SELECT 0
+
+		** 2. BU SEVK NUMARASINA AÝT FATURALARI TOPLA
+		JSONmetin = "["
+		sayac = 0
+
+		SELECT ftrrpr
+		** Hýz için son 15.000 kayda bakýyoruz (Senin paketSorgula mantýðýnla ayný)
+		GO RECCOUNT()-15000
+		LOCATE REST FOR sevklistno = aktifSevkNo
+
+		DO WHILE FOUND() .and. !EOF()
+			ftno=iif(TYPE("ftrrpr->faturano")="C", ftrrpr->faturano, STR(ftrrpr->no1,7))
+
+			SELECT c100
+			SEEK ftrrpr.eczanekodu
+
+			SELECT ftrcikis
+			SEEK ftno
+			LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu=ftrrpr.eczanekodu
+			
+			** Eðer ftrcikis'te varsa oradaki adetleri al (Yani önceden okutulmuþlar), yoksa 0
+			v_koli = IIF(FOUND(), ftrcikis.kolisay, 0)
+			v_poset = IIF(FOUND(), ftrcikis.posetsay, 0)
+			v_buzluk = IIF(FOUND(), ftrcikis.buzluksay, 0)
+			v_sepet = IIF(FOUND(), ftrcikis.sepetsay, 0)
+
+			JSONmetin = JSONmetin+"{'ftrrec':'"+LTRIM(STR(RECNO("ftrrpr")))+"',"
+			JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
+			JSONmetin = JSONmetin+"'adi':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
+			JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
+			JSONmetin = JSONmetin+"'semt':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
+			JSONmetin = JSONmetin+"'sehir':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
+			JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
+			JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
+			JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
+			JSONmetin = JSONmetin+"'sevklistno':'"+ftrrpr.sevklistno+"',"
+			
+			** DÝKKAT: Cihaza oss, ops, oks, obs olarak okutulmuþ gibi gidecek
+			JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(v_koli))+"',"
+			JSONmetin = JSONmetin+"'posetsay':'"+LTRIM(STR(v_poset))+"',"
+			JSONmetin = JSONmetin+"'buzluksay':'"+LTRIM(STR(v_buzluk))+"',"
+			JSONmetin = JSONmetin+"'sepetsay':'"+LTRIM(STR(v_sepet))+"',"
+			
+			JSONmetin = JSONmetin+"'sevksekli':'"+ftrrpr.sevksekli+"',"
+			JSONmetin = JSONmetin+"'ftrsaati':'"+ctotime(subs(ftrrpr.saati,1,2))+"',"
+			JSONmetin = JSONmetin+"'sipsaati':'"+ctotime(subs(ftrrpr.saati,4,2))+"',"
+			JSONmetin = JSONmetin+"'ftrtarih':'"+TRANSFORM(ftrrpr.tarih)+"',"
+
+			** SEPET KODLARINI BUL
+			sepetstr=""
+			SELECT sepet
+			LOCATE FOR takipno=ftrrpr.takipno .and. eczanekodu=ftrrpr.eczanekodu
+			DO WHILE !EOF()
+				IF kapak$"123K"
+					sepetstr = sepetstr + sepetkodu+","
+				ENDIF
+				CONTINUE 
+			ENDDO 
+			sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
+			JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'},"
+
+			sayac = sayac + 1
+			
+			SELECT ftrrpr
+			CONTINUE 
+		ENDDO 
+
+		IF sayac > 0
+			JSONmetin = LEFT(JSONmetin,LEN(JSONmetin)-1)
+			JSONmetin = JSONmetin+"]"
+			wlogout()
+			RETURN JSONmetin 
+		ELSE 
+			wlogout()
+			RETURN "false"
+		ENDIF
+	ENDPROC
 
 **------------------------------------------------------------------------------------------------------------------------------	
 **sepetokut veya plaka sorgula
@@ -363,7 +521,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	         xobje="P"
 	         SELECT ftrrpr
 	         SET ORDER TO 0
-	         GO RECCOUNT()-10000
+	         GO RECCOUNT()-15000
 	         LOCATE REST FOR takipno = ptakipno
 	         IF FOUND() then
 	        	ftnovar=(TYPE("ftrrpr->faturano")="C")
@@ -389,7 +547,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	         xobje="P"
 	         SELECT ftrrpr
 	         SET ORDER TO 0
-	         GO RECCOUNT()-10000
+	         GO RECCOUNT()-15000
 	         LOCATE REST FOR takipno = ptakipno
 	         IF FOUND() then
 	        	ftnovar=(TYPE("ftrrpr->faturano")="C")
@@ -523,6 +681,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 			JSONMetin = "[{'ftrrec':'"+LTRIM(RTRIM(STR(RECNO("ftrrpr"))))+"',"
 			JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
     		JSONmetin = JSONmetin+"'adi':'"+LTRIM(RTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
+    		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
     		JSONmetin = JSONmetin+"'semt':'"+LTRIM(RTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
     		JSONmetin = JSONmetin+"'sehir':'"+LTRIM(RTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
     		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
@@ -671,12 +830,13 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 						SEVKBILGI = etiketbilgisi
 					
 					ENDIF 	
-					IF xetkyazicino="0" .or. xetkyazicino="" THEN 
-						RESTORE FROM &STKPATH.etkayar.mem ADDITIVE 
-						etkyazicino = LTRIM(RTRIM(AYR_ETIKETYAZ))
-					ELSE 
-						etkyazicino = xetkyazicino
-					endif
+					**IF xetkyazicino="0" .or. xetkyazicino="" THEN 
+						**RESTORE FROM &STKPATH.etkayar.mem ADDITIVE 
+						**etkyazicino = LTRIM(RTRIM(AYR_ETIKETYAZ))
+					**ELSE 
+						**etkyazicino = xetkyazicino
+					**endif
+					etkyazicino = xetkyazicino
 					dosyaYolu = BPATH+ "yazici\E"+etkyazicino + "\"+ LKOD +sifir(MOD(SECONDS()*10,1000000),6)+".txt"
 					
 					yazilacakEtiketMetni = etkstr(LBOLGE,LSAAT,LSEVK,LECZANE,LKOD,LECZACI,LADRES1,LADRES2,LSEHIR,LSAYISAL,LRENK,LSEPET,LSEPET2,SEVKBILGI)
@@ -689,8 +849,10 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 					**FCLOSE(btxt)
 					
 					logYaz("denemelog.txt",yazilacakEtiketMetni )
+					jsonSonuc = '{"durum":"OK", "eczane":"' + ALLTRIM(c100.adi) + '", "bolge":"' + ALLTRIM(LBOLGE) + '", "takipno":"' + ltakipno + '"}'
+					
 					wlogout()
-					RETURN jsonStr 
+					RETURN jsonSonuc
 	         	ELSE
 	         		**irsrpr den al
 	         		SELECT irsrpr 
@@ -702,8 +864,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		ENDCASE 
 		CLOSE DATABASES
 		wlogout()
-		RETURN "false"
-		
+		RETURN '{"Durum":"HATA", "Mesaj":"Fatura bulunamadý"}'
 	ENDPROC 
 	
 **------------------------------------------------------------------------------------------------------------------------------	
@@ -803,25 +964,31 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 				SEVKBILGI = etiketbilgisi
 			
 			ENDIF 	
-			IF xetkyazicino="0" .or. xetkyazicino="" THEN 
-				RESTORE FROM &STKPATH.etkayar.mem ADDITIVE 
-				etkyazicino = LTRIM(RTRIM(AYR_ETIKETYAZ))
-			ELSE 
-				etkyazicino = xetkyazicino
-			endif
+			**IF xetkyazicino="0" .or. xetkyazicino="" THEN 
+				**RESTORE FROM &STKPATH.etkayar.mem ADDITIVE 
+				**etkyazicino = LTRIM(RTRIM(AYR_ETIKETYAZ))
+			**ELSE 
+				**etkyazicino = xetkyazicino
+			**endif
+			etkyazicino = xetkyazicino
 			dosyaYolu = BPATH+ "yazici\E"+etkyazicino + "\"+ LKOD+sifir(MOD(SECONDS()*10,1000000),6)+".txt"			
 			yazilacakEtiketMetni = etkstr(LBOLGE,LSAAT,LSEVK,LECZANE,LKOD,LECZACI,LADRES1,LADRES2,LSEHIR,LSAYISAL,LRENK,LSEPET,LSEPET2,SEVKBILGI)
 			fh = FCREATE(dosyaYolu)
 			FWRITE(fh,yazilacakEtiketMetni)
 			FCLOSE(fh)
-
+			
+			jsonstr = '{"Durum":"OK", ' + ;          
+					  '"Eczane":"' + ALLTRIM(DTrkWstr(c100.adi)) + '", ' + ;          
+					  '"Bolge":"' + ALLTRIM(LBOLGE) + '", ' + ;          
+					  '"Takipno":"' + ALLTRIM(ltakipno) + '", ' + ;          
+					  '"Mesaj":"Basým Baþarýlý"}'
 			logYaz("denemelog.txt",yazilacakEtiketMetni )
 			wlogout()
 			RETURN jsonstr		
 		ENDIF 
 		
 		wlogout()
-		RETURN "false"
+		RETURN '{"Durum":"HATA", "Mesaj":"Fatura bulunamadý"}'
 	ENDPROC 
 *--------------------------------------------------------------------------------------------------------------------------
 	PROCEDURE test
@@ -855,13 +1022,14 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	PROCEDURE getSubeCepVeFirma
 		jsonDon = ""
 		this.definePaths()
-		BPATH = this.BPATH
-		STKPATH = this.STKPATH
-		RESTORE FROM &BPATH.subeno.mem ADDITIVE 
-		RESTORE FROM &BPATH.memfile.mem ADDITIVE
-		RESTORE FROM &STKPATH.memfile.mem ADDITIVE
+		**BPATH = this.BPATH
+		**STKPATH = this.STKPATH
+		**RESTORE FROM &BPATH.subeno.mem ADDITIVE 
+		**RESTORE FROM &BPATH.memfile.mem ADDITIVE
+		
 
-		jsonDon = "{'subeno':'"+SUBENO+"','cepno':'"+_CEPNO+"','depoadi':'"+DEPOADI+"'}"
+		**jsonDon = "{'subeno':'"+this._SUBENO+"','cepno':'"+this._CEPNO+"','depoadi':'"+DEPOADI+"'}"
+		jsonDon = "{'subeno':'"+this._SUBENO+"','cepno':'"+this._CEPNO+"','depoadi':'"+this._DEPOADI+"'}"
 		RETURN jsonDon	
 	ENDPROC  
 *--------------------------------------------------------------------------------------------------
@@ -994,7 +1162,96 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	Procedure FatnoStr
 		Param psr, pfno
 		return longtotext(pfno)+padr(psr,3)
-	endproc
+	ENDPROC
+	
+	
+	**------------------------------------------------------------------------------------------------------------------------------	
+	** Son faturalarý, þifreli saatleri çözerek ve baðlý sepetlerle birlikte getirir
+	PROCEDURE getSonSevkiyatDetayli(pGeriyeBak)
+	    this.definePaths()
+	    STKPATH = this.STKPATH
+	    
+	    IF TYPE("pGeriyeBak") != "N" OR pGeriyeBak <= 0
+	        pGeriyeBak = 1000
+	    ENDIF
+
+	    ** Tablolarý aç
+	    IF FILE(STKPATH+"sepet.dbf")
+	       USE &STKPATH.sepet SHARED IN 0
+	    ELSE
+	       USE &STKPATH.sepetler ALIAS sepet SHARED IN 0
+	    ENDIF
+	    USE &STKPATH.ftrrpr SHARED IN 0
+	    
+	    SELECT ftrrpr
+	    SET ORDER TO 0  
+	    
+	    ** Son kayýtlara zýpla
+	    IF RECCOUNT() > pGeriyeBak
+	        GO RECCOUNT() - pGeriyeBak
+	    ELSE
+	        GO TOP
+	    ENDIF
+
+	    JSONMetin = "["
+	    
+	    
+	    SCAN REST FOR ALLTRIM(TRANSFORM(ftrrpr.cepno)) == ALLTRIM(TRANSFORM(this._CEPNO))
+	    	IF EMPTY(ftrrpr.takipno) OR ISNULL(ftrrpr.takipno)
+	    		LOOP   
+	    	ENDIF
+	    
+	        cTkpNo = ftrrpr.takipno
+	        cEczKodu = ftrrpr.eczanekodu
+	        
+	       
+	        sepetstr = ""
+	        SELECT sepet
+	        SET ORDER TO 0
+	        GO TOP
+	      
+	        LOCATE FOR takipno == cTkpNo .AND. eczanekodu == cEczKodu
+	        
+	        DO WHILE FOUND() .AND. !EOF()
+	            IF kapak $ "123K"
+	                sepetstr = sepetstr + "{'sepetno':'" + ALLTRIM(TRANSFORM(sepetkodu)) + "','zaman':'" + ALLTRIM(TRANSFORM(bitzaman)) + "'},"
+	            ENDIF
+	            CONTINUE 
+	        ENDDO 
+
+	        ** Sepeti olmayan faturayý es geç 
+	        IF EMPTY(sepetstr)
+	            SELECT ftrrpr
+	            LOOP
+	        ENDIF
+
+	        ** Sepetlerin sonundaki virgülü temizle
+	        sepetstr = LEFT(sepetstr, LEN(sepetstr)-1)
+
+	        SELECT ftrrpr
+	        ** JSON satýrýný oluþtur
+	        lcSatir = "{'subeno':'" + ALLTRIM(TRANSFORM(this._SUBENO)) + "'," + ;
+	                  "'cepno':'" + ALLTRIM(TRANSFORM(ftrrpr.cepno)) + "'," + ;
+	                  "'faturano':'" + ALLTRIM(FatnoCoz(faturano)) + "'," + ;
+	                  "'takipno':'" + ALLTRIM(cTkpNo) + "'," + ;
+	                  "'ftrtarih':'" + TRANSFORM(ftrrpr.tarih) + "'," + ;
+	                  "'ftrsaati':'" + ctotime(subs(ftrrpr.saati,1,2)) + "'," + ;
+	                  "'sipsaati':'" + ctotime(subs(ftrrpr.saati,4,2)) + "'," + ;
+	                  "'sepetler':[" + sepetstr + "]},"
+	        
+	        ** Olasý enter karakterlerini temizle ve ana metne ekle
+	        JSONMetin = JSONMetin + STRTRAN(STRTRAN(lcSatir, CHR(13), ""), CHR(10), "")
+	    ENDSCAN
+
+	    ** JSON dizisini kapat
+	    IF RIGHT(JSONMetin, 1) == ","
+	        JSONMetin = LEFT(JSONMetin, LEN(JSONMetin)-1)
+	    ENDIF
+	    JSONMetin = JSONMetin + "]"
+
+	    wlogout()
+	    RETURN JSONMetin
+	ENDPROC
 	
 ENDDEFINE
 

@@ -17,6 +17,7 @@ PROCEDURE wlogon
 	#define LOGON32_LOGON_BATCH             4
 	#define LOGON32_LOGON_SERVICE           5
 	#define LOGON32_LOGON_UNLOCK            7
+	#define LOGON32_LOGON_NEW_CREDENTIALS   9
 	DECLARE integer LogonUser IN AdvApi32.DLL;
 	string szUsername,;
 	string lpszDomain,;
@@ -56,4 +57,5 @@ PROCEDURE TEST(i)
 
 	RETURN test(i)
 ENDPROC
+	
 	
