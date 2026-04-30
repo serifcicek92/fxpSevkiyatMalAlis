@@ -1086,7 +1086,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	PROCEDURE plakaSevkSaatiEkle(plkNo)
 		this.definePaths()
 		STKPATH = this.STKPATH 
-		
+				
 		USE &STKPATH.sevklist SHARED 
 		SELECT 0
 		
@@ -1107,20 +1107,24 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		SET ORDER TO 3 DESCENDING 
 		SEEK plkNo
 		**LOCATE FOR plakano=plkNo .and. donustarih<CTOD("1/1/1") .and. sevktarihi>DATE()-2
-		
+		LOCAL lKayitBulundu,svkno
 		svkno=""
+		lKayitBulundu = .F.
+
 		IF FOUND() then
 			LOCATE REST WHILE plakano = plkNo FOR donustarih < CTOD("1/1/1") .AND. sevktarihi > DATE()-2
 			**svkno = TRANSFORM(INT(texttolong(sevklistno)))
 			**replace NEXT 1 sevktarihi WITH DATE(),sevksaati WITH TIME(1)
 			**RETURN svkno
 			IF FOUND()
+				lKayitBulundu = .T.
 	            svkno = TRANSFORM(INT(texttolong(sevklistno)))
 	            REPLACE NEXT 1 sevktarihi WITH DATE(), sevksaati WITH TIME(1)
 	            RETURN svkno
 	        ENDIF
-
-		ELSE 	
+		ENDIF
+		
+		IF lKayitBulundu = .F. then	
 
 			  SELECT belgeno
 		      loca for belgetipi="SEVKNO"
