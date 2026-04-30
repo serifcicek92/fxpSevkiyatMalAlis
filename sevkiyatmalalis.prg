@@ -52,18 +52,64 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		
 	ENDFUNC
 
-**------------------------------------------------------------------------------------------------------------------------------	
-	
-********* bolgeyi full tara	
-	PROCEDURE bolgeTara(bolgeNo,okunanTarih)
+	PROCEDURE bolgeyiServistenTara(bolgeNo,okunanTarih, pOkunanTakipNo)
+		this.definePaths()
+		BPATH = this.BPATH
+		STKPATH = this.STKPATH
+		KLASOR = this.KLASOR
+		
+		IF FILE(STKPATH+"sepet.dbf")
+		   USE &STKPATH.sepet SHARED
+		ELSE
+		   USE &STKPATH.sepetler ALIAS sepet SHARED
+		ENDIF
+		SELECT 0
+
+		IF "SELDATA" $ this.STKPATH THEN 
+			USE &STKPATH.c100 SHARED
+		    if empty(cdx(1))
+		      set index to &STKPATH.c110
+		    endif
+		    set order to 1 
+		    SELECT 0
+		ELSE
+			USE &KLASOR.c100 SHARED
+		    if empty(cdx(1))
+		      set index to &KLASOR.c110
+		    endif
+		    set order to 1 
+		    SELECT 0
+		ENDIF 
+
+		USE &STKPATH.ftrcikis SHARED
+		SET ORDER TO 1
+		SELECT 0
+
+		USE &STKPATH.ftrrpr SHARED
+		IF EMPTY(CDX(1))
+		   SET INDEX TO &STKPATH.iftrrpr, &STKPATH.iftrrprk, &STKPATH.iftrrprt
+		ENDIF
+		SET ORDER TO 0
+		SELECT 0
+
+		
+		JSONdon = this.bolgeTara(bolgeNo,okunanTarih, pOkunanTakipNo)
+		RETURN JSONdon
+	ENDPROC
+
+	**------------------------------------------------------------------------------------------------------------------------------	
+	********* bolgeyi full tara	
+	PROCEDURE bolgeTara(bolgeNo,okunanTarih, pOkunanTakipNo)
 		*this.definePaths()
 		STKPATH = this.STKPATH
 		SELECT ftrrpr 
+		
+		ftnovar = (TYPE("ftrrpr->faturano")="C")
 		**do softseek with dtoc(okunanTarih,1),3
 		SET ORDER TO 3
 		GO TOP
 		SEEK DTOC(okunanTarih,1)
-		LOCATE WHILE tarih=okunanTarih FOR bolge=bolgeNo
+		LOCATE WHILE DTOC(tarih,1)=DTOC(okunanTarih,1) FOR bolge=bolgeNo
 		JSONmetin = "["
 		a=1
 		b=1
@@ -84,7 +130,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		               APPEND BLANK
 		               REPLACE NEXT 1 faturano WITH ftno, eczanekodu WITH ftrrpr->eczanekodu, tarih WITH ftrrpr->tarih, kolisay WITH 0, posetsay WITH 0, buzluksay with 0, sepetsay with 0
 	            	ENDIF 
-	            	IF EMPTY(sevksaati) 
+	            	IF EMPTY(sevksaati) .OR. (TYPE("pOkunanTakipNo") = "C" .AND. ALLTRIM(ftrrpr.takipno) == ALLTRIM(pOkunanTakipNo))
 	            	**.and. FOUND() then 
 	            		JSONmetin = JSONmetin+"{'ftrrec':'"+LTRIM(STR(RECNO("ftrrpr")))+"',"
 	            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
@@ -526,7 +572,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	         IF FOUND() then
 	        	ftnovar=(TYPE("ftrrpr->faturano")="C")
 	        	IF taransinmi="true" then
-					JSONdon = this.bolgeTara(ftrrpr.bolge,ftrrpr.tarih)
+					JSONdon = this.bolgeTara(ftrrpr.bolge,ftrrpr.tarih, ftrrpr.takipno)
 				ELSE 
 					JSONDonen=this.okunanBilgiGetir(ftrrpr.takipno,"",ftrrpr.bolge)
 				ENDIF 
@@ -553,7 +599,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	        	ftnovar=(TYPE("ftrrpr->faturano")="C")
 	        	**BOLGEDEKÝ SEPETLERÝ TARA
 	        	IF taransinmi="true" then
-					JSONDonen= this.bolgeTara(ftrrpr.bolge,ftrrpr.tarih)
+					JSONDonen= this.bolgeTara(ftrrpr.bolge,ftrrpr.tarih, ftrrpr.takipno)
 				ELSE 
 					JSONDonen=this.okunanBilgiGetir(ftrrpr.takipno,"",ftrrpr.bolge)
 				ENDIF 
@@ -595,7 +641,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 				JSONdon="dene"
 				IF taransinmi="true" then
 				**BOLGEDEKÝ SEPETLERÝ TARA
-					JSONdon = this.bolgeTara(bolgeNo,ftrrpr.tarih)
+					JSONdon = this.bolgeTara(bolgeNo,ftrrpr.tarih, ftrrpr.takipno)
 				ELSE 
 					JSONdon = this.okunanBilgiGetir(takipno,ftrrpr.tarih,bolgeNo)
 				endif
