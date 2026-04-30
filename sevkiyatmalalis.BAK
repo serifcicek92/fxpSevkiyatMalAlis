@@ -56,6 +56,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		this.definePaths()
 		BPATH = this.BPATH
 		STKPATH = this.STKPATH
+		KLASOR = this.KLASOR
 		
 		IF FILE(STKPATH+"sepet.dbf")
 		   USE &STKPATH.sepet SHARED
@@ -98,194 +99,191 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 
 	**------------------------------------------------------------------------------------------------------------------------------	
 	********* bolgeyi full tara	
-	PROCEDURE bolgeTara(bolgeNo,okunanTarih, pOkunanTakipNo)
-		*this.definePaths()
-		STKPATH = this.STKPATH
-		SELECT ftrrpr 
-		
-		ftnovar = (TYPE("ftrrpr->faturano")="C")
-		**do softseek with dtoc(okunanTarih,1),3
-		SET ORDER TO 3
-		GO TOP
-		SEEK DTOC(okunanTarih,1)
-		LOCATE WHILE DTOC(tarih,1)=DTOC(okunanTarih,1) FOR bolge=bolgeNo
-		JSONmetin = "["
-		a=1
-		b=1
-		
-		DO WHILE !EOF()
-			IF ftrrpr.bolge $ bolgeNo THEN 
-				ftno=iif(ftnovar,ftrrpr->faturano ,STR(ftrrpr->no1,7))
-				SELECT c100
-				SET ORDER TO 1
-				SEEK ftrrpr.eczanekodu
-				IF FOUND() THEN
-					SELECT ftrcikis
-					SET ORDER TO 1
-					SEEK ftno
-					LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih.and.eczanekodu=ftrrpr.eczanekodu
-					if !found() then
-						a=a+1
-		               APPEND BLANK
-		               REPLACE NEXT 1 faturano WITH ftno, eczanekodu WITH ftrrpr->eczanekodu, tarih WITH ftrrpr->tarih, kolisay WITH 0, posetsay WITH 0, buzluksay with 0, sepetsay with 0
-	            	ENDIF 
-	            	IF EMPTY(sevksaati) .OR. (TYPE("pOkunanTakipNo") = "C" .AND. ALLTRIM(ftrrpr.takipno) == ALLTRIM(pOkunanTakipNo))
-	            	**.and. FOUND() then 
-	            		JSONmetin = JSONmetin+"{'ftrrec':'"+LTRIM(STR(RECNO("ftrrpr")))+"',"
-	            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
-	            		JSONmetin = JSONmetin+"'adi':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
-	            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
-	            		JSONmetin = JSONmetin+"'semt':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
-	            		JSONmetin = JSONmetin+"'sehir':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
-	            		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
-	            		JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
-	            		JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"    		
-    					JSONmetin = JSONmetin+"'sevklistno':'"+ftrrpr.sevklistno+"',"
-	            		JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(ftrcikis.kolisay))+"',"
-	            		JSONmetin = JSONmetin+"'posetsay':'"+LTRIM(STR(ftrcikis.posetsay))+"',"
-	            		JSONmetin = JSONmetin+"'buzluksay':'"+LTRIM(STR(ftrcikis.buzluksay))+"',"
-	            		JSONmetin = JSONmetin+"'sepetsay':'"+LTRIM(STR(ftrcikis.sepetsay))+"',"
-	            		JSONmetin = JSONmetin+"'sevksekli':'"+ftrrpr.sevksekli+"',"
-	            		JSONmetin = JSONmetin+"'ftrsaati':'"+ctotime(subs(ftrrpr.saati,1,2))+"',"
-	            		JSONmetin = JSONmetin+"'sipsaati':'"+ctotime(subs(ftrrpr.saati,4,2))+"',"
-	            		JSONmetin = JSONmetin+"'ftrtarih':'"+TRANSFORM(ftrrpr.tarih)+"',"
-	            		**SEPETLERÝ GETÝR
-	            		sepetstr=""
-	            		SELECT sepet
-	            		loca for takipno=ftrrpr.takipno.and.eczanekodu=ftrrpr.eczanekodu
-	            		DO while !EOF()
-	            			IF kapak$"123K"
-	            				sepetstr = sepetstr + sepetkodu+","
-	            			ENDIF
-	            			CONTINUE 
-	            		ENDDO 
-	            		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-	            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'},"
-	            		b=b+1
-	            	ENDIF 	
-	            ENDIF					
-				**JSONmetin = "a"+STR(a)+"-"+STR(b)
-			ENDIF 
-		
-			SELECT ftrrpr
-			**SKIP
-			**LOOP
-			CONTINUE  
-		ENDDO 
-		JSONmetin = LEFT(JSONmetin,LEN(JSONmetin)-1)
-		JSONmetin = JSONmetin+"]"
-		RETURN JSONmetin 
-	ENDPROC 
+	PROCEDURE bolgeTara(bolgeNo, okunanTarih, pOkunanTakipNo)
+	    LOCAL JSONmetin, sepetstr, ftno, ftnovar, slistno
+	    JSONmetin = "[]" && Baþlangýçta boþ bir JSON dizisi
+	    
+	    SELECT ftrrpr 
+	    ftnovar = (TYPE("ftrrpr->faturano")="C")
+	    
+	    SET ORDER TO 3
+	    *-- SEEK ve LOCATE ile sadece ilgili tarihteki kayýtlarý tara
+	    SEEK DTOC(okunanTarih, 1)
+	    
+	    IF FOUND()
+	        JSONmetin = "[" && Kayýt varsa dizi baþlat
+	        
+	        LOCATE WHILE DTOC(tarih, 1) = DTOC(okunanTarih, 1) FOR bolge = bolgeNo
+	        
+	        DO WHILE FOUND() .AND. !EOF()
+	            ftno = iif(ftnovar, ftrrpr->faturano, STR(ftrrpr->no1, 7))
+	            
+	            SELECT c100
+	            SET ORDER TO 1
+	            SEEK ftrrpr.eczanekodu
+	            
+	            IF FOUND()
+	                SELECT ftrcikis
+	                SET ORDER TO 1
+	                SEEK ftno
+	                LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu = ftrrpr.eczanekodu
+	                
+	                IF !FOUND()
+	                    APPEND BLANK
+	                    REPLACE faturano WITH ftno, ;
+	                            eczanekodu WITH ftrrpr->eczanekodu, ;
+	                            tarih WITH ftrrpr->tarih, ;
+	                            kolisay WITH 0, posetsay WITH 0, buzluksay WITH 0, sepetsay WITH 0
+	                ENDIF 
+	                
+	                *-- Filtreleme Kontrolü
+	                IF EMPTY(sevksaati) .OR. (TYPE("pOkunanTakipNo") = "C" .AND. ALLTRIM(ftrrpr.takipno) == ALLTRIM(pOkunanTakipNo))
+	                    
+	                    JSONmetin = JSONmetin + "{" 
+	                    JSONmetin = JSONmetin + "'ftrrec':'" + ALLTRIM(STR(RECNO("ftrrpr"))) + "',"
+	                    JSONmetin = JSONmetin + "'hesapkodu':'" + ftrrpr.eczanekodu + "',"
+	                    JSONmetin = JSONmetin + "'adi':'" + ALLTRIM(CPCONVERT(857, 1254, c100.adi)) + "',"
+	                    JSONmetin = JSONmetin + "'cepno':'" + ALLTRIM(ftrrpr.cepno) + "',"
+	                    JSONmetin = JSONmetin + "'semt':'" + ALLTRIM(CPCONVERT(857, 1254, c100.semt)) + "',"
+	                    JSONmetin = JSONmetin + "'sehir':'" + ALLTRIM(CPCONVERT(857, 1254, c100.sehir)) + "',"
+	                    JSONmetin = JSONmetin + "'bolge':'" + c100.bolge + "',"
+	                    JSONmetin = JSONmetin + "'faturano':'" + FatnoCoz(ftno) + "',"
+	                    JSONmetin = JSONmetin + "'takipno':'" + ftrrpr.takipno + "'," 
+	                    slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="", "", TexttoLong(ftrrpr.sevklistno)))
+	                    JSONmetin = JSONmetin + "'sevklistno':'" + slistno + "',"
+	                    JSONmetin = JSONmetin + "'kolisay':'" + LTRIM(STR(ftrcikis.kolisay)) + "',"
+	                    JSONmetin = JSONmetin + "'posetsay':'" + LTRIM(STR(ftrcikis.posetsay)) + "',"
+	                    JSONmetin = JSONmetin + "'buzluksay':'" + LTRIM(STR(ftrcikis.buzluksay)) + "',"
+	                    JSONmetin = JSONmetin + "'sepetsay':'" + LTRIM(STR(ftrcikis.sepetsay)) + "',"
+	                    JSONmetin = JSONmetin + "'sevksekli':'" + ftrrpr.sevksekli + "',"
+	                    JSONmetin = JSONmetin + "'ftrsaati':'" + ctotime(subs(ftrrpr.saati, 1, 2)) + "',"
+	                    JSONmetin = JSONmetin + "'sipsaati':'" + ctotime(subs(ftrrpr.saati, 4, 2)) + "',"
+	                    JSONmetin = JSONmetin + "'ftrtarih':'" + TRANSFORM(ftrrpr.tarih) + "',"
+	                    
+	                    *-- SEPETLER
+	                    sepetstr = ""
+	                    SELECT sepet
+	                    LOCATE FOR takipno = ftrrpr.takipno .and. eczanekodu = ftrrpr.eczanekodu
+	                    DO WHILE FOUND() .AND. !EOF()
+	                        IF kapak $ "123K"
+	                            sepetstr = sepetstr + ALLTRIM(sepetkodu) + ","
+	                        ENDIF
+	                        CONTINUE 
+	                    ENDDO 
+	                    
+	                    IF LEN(sepetstr) > 0
+	                        sepetstr = LEFT(sepetstr, LEN(sepetstr) - 1)
+	                    ENDIF
+	                    
+	                    JSONmetin = JSONmetin + "'sepetler':'" + ALLTRIM(sepetstr) + "'},"
+	                ENDIF 
+	            ENDIF
+	            
+	            SELECT ftrrpr
+	            CONTINUE && LOCATE WHILE devam eder
+	        ENDDO 
+	        
+	        *-- Eðer döngü sonunda JSONmetin hala "[" deðilse (yani kayýt eklenmiþse) son virgülü sil ve kapat
+	        IF LEN(JSONmetin) > 1
+	            JSONmetin = LEFT(JSONmetin, LEN(JSONmetin) - 1) + "]"
+	        ELSE
+	            JSONmetin = "[]"
+	        ENDIF
+	    ENDIF
+
+	    RETURN JSONmetin 
+	ENDPROC
 **------------------------------------------------------------------------------------------------------------------------------	
 	
 	PROCEDURE okunanBilgiGetir(okunanTakipNo,okunanTarihg,okunanBolgeNo)
-		*this.definePaths()
-		SELECT ftrrpr
-		JSONmetin = "["
-		IF ftrrpr.bolge $ okunanBolgeNo THEN 
-				ftno=iif(ftnovar,ftrrpr->faturano ,STR(ftrrpr->no1,7))
-				SELECT c100
-				SET ORDER TO 1
-				SEEK ftrrpr.eczanekodu
-				IF FOUND() THEN
-					SELECT ftrcikis
+			LOCAL JSONmetin, ftno, ftnovar, slistno, sepetstr
+			JSONmetin = "[]" && Baþlangýçta geçerli bir boþ dizi
+			
+			SELECT ftrrpr
+			
+			IF ftrrpr.bolge $ okunanBolgeNo THEN 
+					ftnovar = (TYPE("ftrrpr->faturano")="C")
+					ftno = iif(ftnovar, ftrrpr->faturano, STR(ftrrpr->no1,7))
+					
+					SELECT c100
 					SET ORDER TO 1
-					SEEK ftno
-					LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih.and.eczanekodu=ftrrpr.eczanekodu
-					IF EMPTY(sevksaati) .and. FOUND() THEN 
-						JSONmetin = JSONmetin+"{'ftrrec':'"+RTRIM(LTRIM(STR(RECNO("ftrrpr"))))+"',"
-	            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
-	            		JSONmetin = JSONmetin+"'adi':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.adi)))+"',"
-	            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
-	            		JSONmetin = JSONmetin+"'semt':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.semt)))+"',"
-	            		JSONmetin = JSONmetin+"'sehir':'"+RTRIM(LTRIM(CPCONVERT(857,1254,c100.sehir)))+"',"
-	            		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
-	            		JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
-	            		JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
-	            		slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="","",TexttoLong(ftrrpr.sevklistno)))
-	            		**JSONmetin = JSONmetin+"'sevklistno':'"+ftrrpr.sevklistno+"',"
-	            		JSONmetin = JSONmetin+"'sevklistno':'"+slistno+"',"
-	            		JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(ftrcikis.kolisay))+"',"
-	            		JSONmetin = JSONmetin+"'posetsay':'"+LTRIM(STR(ftrcikis.posetsay))+"',"
-	            		JSONmetin = JSONmetin+"'buzluksay':'"+LTRIM(STR(ftrcikis.buzluksay))+"',"
-	            		JSONmetin = JSONmetin+"'sepetsay':'"+LTRIM(STR(ftrcikis.sepetsay))+"',"
-	            		JSONmetin = JSONmetin+"'sevksekli':'"+ftrrpr.sevksekli+"',"
-	            		JSONmetin = JSONmetin+"'ftrsaati':'"+ctotime(subs(ftrrpr.saati,1,2))+"',"
-	            		JSONmetin = JSONmetin+"'sipsaati':'"+ctotime(subs(ftrrpr.saati,4,2))+"',"
-	            		JSONmetin = JSONmetin+"'ftrtarih':'"+TRANSFORM(ftrrpr.tarih)+"',"
-	            		**SEPETLERY GETYR
-	            		sepetstr=""
-	            		SELECT sepet
-	            		loca for takipno=ftrrpr.takipno.and.eczanekodu=ftrrpr.eczanekodu
-	            		DO while !EOF()
-	            			IF kapak$"123K"
-	            				sepetstr = sepetstr + sepetkodu+","
-	            			ENDIF
-	            			CONTINUE 
-	            		ENDDO 
-	            		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-	            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'}]"
-	              ELSE
-              	
-					JSONmetin = JSONmetin + "{'ftrrec':'" + TRANSFORM(RECNO("ftrrpr")) + "',"
-            		JSONmetin = JSONmetin+"'hesapkodu':'"+ftrrpr.eczanekodu+"',"
-            		JSONmetin = JSONmetin+"'adi':'"+CPCONVERT(857,1254,c100.adi)+"',"
-            		JSONmetin = JSONmetin+"'cepno':'"+RTRIM(LTRIM(ftrrpr.cepno))+"',"
-            		JSONmetin = JSONmetin+"'semt':'"+CPCONVERT(857,1254,c100.semt)+"',"
-            		JSONmetin = JSONmetin+"'sehir':'"+CPCONVERT(857,1254,c100.sehir)+"',"
-            		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
-            		JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
-            		JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
-     					
-            		slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="","",TexttoLong(ftrrpr.sevklistno)))
-            		**RETURN TRANSFORM(sepetirsrecno)
-            		JSONmetin = JSONmetin+"'sevklistno':'"+slistno+"',"
-            		SET DELETED OFF 
-	              	SELECT irsrpr
-	              	IF TYPE("sepetirsrecno") != "U" .AND. RECCOUNT()>sepetirsrecno THEN 
-		              	GO sepetirsrecno
-	            		JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(irsrpr.kolisay))+"',"
-	            		JSONmetin = JSONmetin+"'posetsay':'"+LTRIM(STR(irsrpr.posetsay))+"',"
-	            		JSONmetin = JSONmetin+"'buzluksay':'"+LTRIM(STR(irsrpr.buzluksay))+"',"
-	            		JSONmetin = JSONmetin+"'sepetsay':'"+LTRIM(STR(irsrpr.sepetsayi))+"',"
-	            		JSONmetin = JSONmetin+"'sevksekli':'"+ftrrpr.sevksekli+"',"
-	            		JSONmetin = JSONmetin+"'ftrsaati':'"+ctotime(subs(ftrrpr.saati,1,2))+"',"
-	            		JSONmetin = JSONmetin+"'sipsaati':'"+ctotime(subs(ftrrpr.saati,4,2))+"',"
-	            		JSONmetin = JSONmetin+"'ftrtarih':'"+TRANSFORM(ftrrpr.tarih)+"',"
-	            		**SEPETLERY GETYR
-            		ELSE 
-            			JSONmetin = JSONmetin+"'kolisay':'0',"
-	            		JSONmetin = JSONmetin+"'posetsay':'0',"
-	            		JSONmetin = JSONmetin+"'buzluksay':'0',"
-	            		JSONmetin = JSONmetin+"'sepetsay':'0',"
-	            		JSONmetin = JSONmetin+"'sevksekli':'"+ftrrpr.sevksekli+"',"
-	            		JSONmetin = JSONmetin+"'ftrsaati':'"+ctotime(subs(ftrrpr.saati,1,2))+"',"
-	            		JSONmetin = JSONmetin+"'sipsaati':'"+ctotime(subs(ftrrpr.saati,4,2))+"',"
-	            		JSONmetin = JSONmetin+"'ftrtarih':'"+TRANSFORM(ftrrpr.tarih)+"',"
-	            		**SEPETLERY GETYR
-            		
-            		ENDIF 
-            		sepetstr=""
-            		SELECT sepet
-            		loca for takipno=ftrrpr.takipno.and.eczanekodu=ftrrpr.eczanekodu
-            		DO while !EOF()
-            			IF kapak$"123K"
-            				sepetstr = sepetstr + sepetkodu+","
-            			ENDIF
-            			CONTINUE 
-            		ENDDO 
-            		sepetstr = LEFT(sepetstr,LEN(sepetstr)-1)
-            		JSONmetin = JSONmetin + "'sepetler':'"+RTRIM(LTRIM(sepetstr))+"'}]"
-	              	SET DELETED ON 
-		          	
-				  ENDIF 
-				  SELECT ftrrpr
-			ELSE
-				RETURN "kayýtyok"
+					SEEK ftrrpr.eczanekodu
+					
+					IF FOUND() THEN
+						JSONmetin = "[{" && Kayýt varsa dizi ve obje açýlýþý
+						
+						SELECT ftrcikis
+						SET ORDER TO 1
+						SEEK ftno
+						LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu = ftrrpr.eczanekodu
+						
+						** Bilgileri doldurma (Ortak kýsýmlarý dýþarýda toplamak daha temiz olur ama yapýný koruyorum)
+						IF EMPTY(sevksaati) .and. FOUND() THEN 
+							JSONmetin = JSONmetin + "'ftrrec':'" + ALLTRIM(STR(RECNO("ftrrpr"))) + "',"
+							JSONmetin = JSONmetin + "'hesapkodu':'" + ftrrpr.eczanekodu + "',"
+							JSONmetin = JSONmetin + "'adi':'" + ALLTRIM(CPCONVERT(857,1254,c100.adi)) + "',"
+							JSONmetin = JSONmetin + "'kolisay':'" + LTRIM(STR(ftrcikis.kolisay)) + "',"
+							JSONmetin = JSONmetin + "'posetsay':'" + LTRIM(STR(ftrcikis.posetsay)) + "',"
+							JSONmetin = JSONmetin + "'buzluksay':'" + LTRIM(STR(ftrcikis.buzluksay)) + "',"
+							JSONmetin = JSONmetin + "'sepetsay':'" + LTRIM(STR(ftrcikis.sepetsay)) + "',"
+						ELSE
+							JSONmetin = JSONmetin + "'ftrrec':'" + TRANSFORM(RECNO("ftrrpr")) + "',"
+							JSONmetin = JSONmetin + "'hesapkodu':'" + ftrrpr.eczanekodu + "',"
+							JSONmetin = JSONmetin + "'adi':'" + ALLTRIM(CPCONVERT(857,1254,c100.adi)) + "',"
+							
+							SET DELETED OFF 
+							SELECT irsrpr
+							IF TYPE("sepetirsrecno") != "U" .AND. RECCOUNT() >= sepetirsrecno .AND. sepetirsrecno > 0 THEN 
+								GO sepetirsrecno
+								JSONmetin = JSONmetin + "'kolisay':'" + LTRIM(STR(irsrpr.kolisay)) + "',"
+								JSONmetin = JSONmetin + "'posetsay':'" + LTRIM(STR(irsrpr.posetsay)) + "',"
+								JSONmetin = JSONmetin + "'buzluksay':'" + LTRIM(STR(irsrpr.buzluksay)) + "',"
+								JSONmetin = JSONmetin + "'sepetsay':'" + LTRIM(STR(irsrpr.sepetsayi)) + "',"
+							ELSE 
+								JSONmetin = JSONmetin + "'kolisay':'0','posetsay':'0','buzluksay':'0','sepetsay':'0',"
+							ENDIF
+							SET DELETED ON
+						ENDIF 
+
+						** Geri kalan ortak alanlar
+						JSONmetin = JSONmetin + "'cepno':'" + ALLTRIM(ftrrpr.cepno) + "',"
+						JSONmetin = JSONmetin + "'semt':'" + ALLTRIM(CPCONVERT(857,1254,c100.semt)) + "',"
+						JSONmetin = JSONmetin + "'sehir':'" + ALLTRIM(CPCONVERT(857,1254,c100.sehir)) + "',"
+						JSONmetin = JSONmetin + "'bolge':'" + c100.bolge + "',"
+						JSONmetin = JSONmetin + "'faturano':'" + FatnoCoz(ftno) + "',"
+						JSONmetin = JSONmetin + "'takipno':'" + ftrrpr.takipno + "',"
+						
+						slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="", "", TexttoLong(ftrrpr.sevklistno)))
+						JSONmetin = JSONmetin + "'sevklistno':'" + slistno + "',"
+						JSONmetin = JSONmetin + "'sevksekli':'" + ftrrpr.sevksekli + "',"
+						JSONmetin = JSONmetin + "'ftrsaati':'" + ctotime(subs(ftrrpr.saati,1,2)) + "',"
+						JSONmetin = JSONmetin + "'sipsaati':'" + ctotime(subs(ftrrpr.saati,4,2)) + "',"
+						JSONmetin = JSONmetin + "'ftrtarih':'" + TRANSFORM(ftrrpr.tarih) + "',"
+
+						** SEPETLERÝ GETÝR (GÜVENLÝ YÖNTEM)
+						sepetstr = ""
+						SELECT sepet
+						LOCATE FOR takipno = ftrrpr.takipno .and. eczanekodu = ftrrpr.eczanekodu
+						DO WHILE FOUND() .AND. !EOF()
+							IF kapak $ "123K"
+								sepetstr = sepetstr + ALLTRIM(sepetkodu) + ","
+							ENDIF
+							CONTINUE 
+						ENDDO 
+						
+						** Virgül temizleme kontrolü
+						IF LEN(sepetstr) > 0
+							sepetstr = LEFT(sepetstr, LEN(sepetstr) - 1)
+						ENDIF
+						
+						JSONmetin = JSONmetin + "'sepetler':'" + ALLTRIM(sepetstr) + "'}]"
+						SELECT ftrrpr
+					ENDIF 
 			ENDIF 
-		ENDIF 
-		RETURN JSONmetin
-	ENDPROC 
+			
+			** Eðer hala "[]" ise veya bozuksa C# için temiz bir dizi dön
+			RETURN JSONmetin
+	ENDPROC
 **------------------------------------------------------------------------------------------------------------------------------	
 **Dönüþ Yap
 	PROCEDURE donusYap(plkNo)
@@ -406,7 +404,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 			JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
 			JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(ftno)+"',"
 			JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
-			JSONmetin = JSONmetin+"'sevklistno':'"+ftrrpr.sevklistno+"',"
+			slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="", "", TexttoLong(ftrrpr.sevklistno)))
+			JSONmetin = JSONmetin+"'sevklistno':'"+slistno+"',"
 			
 			** DÝKKAT: Cihaza oss, ops, oks, obs olarak okutulmuþ gibi gidecek
 			JSONmetin = JSONmetin+"'kolisay':'"+LTRIM(STR(v_koli))+"',"
@@ -732,7 +731,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
     		JSONmetin = JSONmetin+"'bolge':'"+c100.bolge+"',"
     		JSONmetin = JSONmetin+"'faturano':'"+FatnoCoz(xftrno)+"',"
     		JSONmetin = JSONmetin+"'takipno':'"+ftrrpr.takipno+"',"
-    		JSONmetin = JSONmetin+"'sevklistno':'"+ftrrpr.sevklistno+"',"
+    		slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="", "", TexttoLong(ftrrpr.sevklistno)))
+    		JSONmetin = JSONmetin+"'sevklistno':'"+slistno+"',"
     		JSONmetin = JSONmetin+"'kolisay':'',"
     		JSONmetin = JSONmetin+"'posetsay':'',"
     		JSONmetin = JSONmetin+"'buzluksay':'',"
@@ -746,7 +746,6 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
     		JSONmetin = JSONmetin + "'sepetler':'"+sepetstr+"'}]"
 			wlogout()
 			RETURN JSONmetin
-		
 		ENDIF 
 		
 		wlogout()
@@ -961,10 +960,15 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		SELECT ftrrpr 
 		SET ORDER TO 1
 		SEEK xftrno
+		
+		
+
+		**SET ORDER TO 3
+		**SEEK DTOC(CTOD(SUBSTR(xptarih,4,2)+"/"+SUBSTR(xptarih,1,2)+"/"+SUBSTR(xptarih,7,4)),1)+xftrno
 		**SEEK DTOC(CTOD(SUBSTR(xptarih,4,2)+"/"+SUBSTR(xptarih,1,2)+"/"+SUBSTR(xptarih,7,4)),1)+xftrno
 		**LOCATE  FOR faturano=xftrno .and. eczanekodu=ALLTRIM(phesapkod)
 		**.and.tarih=ctod(xptarih)
-			
+		
 		IF FOUND() THEN
 			LBOLGE = ftrrpr.bolge
      		LSAAT =""
@@ -1029,7 +1033,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 					  '"Mesaj":"Basým Baþarýlý"}'
 			logYaz("denemelog.txt",yazilacakEtiketMetni )
 			wlogout()
-			RETURN jsonstr		
+			RETURN jsonstr			
 		ENDIF 
 		
 		wlogout()
@@ -1102,8 +1106,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		SELECT sevklist
 		SET ORDER TO 3 DESCENDING 
 		SEEK plkNo
-		LOCATE FOR plakano=plkNo .and. donustarih<CTOD("1/1/1") .and. sevktarihi>DATE()-2
-		**.and. sevktarihi>DATE()-2
+		**LOCATE FOR plakano=plkNo .and. donustarih<CTOD("1/1/1") .and. sevktarihi>DATE()-2
+		
 		svkno=""
 		IF FOUND() then
 			svkno = TRANSFORM(INT(texttolong(sevklistno)))
@@ -1136,15 +1140,11 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		
 		RETURN svkno
 	ENDPROC 
-*--------------------------------------------------------------------------------------------------
-*Eczane Sevk Kayýt Ýþlemleri
-	PROCEDURE EczaneCikisSevkKayit(eczkod,tkpno,fatno,sevkno,plkno,ss,ps,bs,ks)
+	
+	PROCEDURE UseTables()
 		this.definePaths()
 		STKPATH = this.STKPATH 
-		seccep="01,02,03,04,05,06,07,08,09"
-		xftrseri=left(fatno,2)
-		xftrnum =INT(val(subs(fatno,at(" ",fatno))))
-		xftrno=fatnostr(xftrseri, xftrnum)
+		
 		
 		USE &STKPATH.sevklist SHARED
 		SELECT 0
@@ -1163,6 +1163,14 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		
 		USE &STKPATH.ftrcikis SHARED
 		SELECT 0
+	ENDPROC 
+	*--------------------------------------------------------------------------------------------------
+	*Eczane Sevk Kayýt Ýþlemleri
+	PROCEDURE EczaneCikisSevkKayit(eczkod,tkpno,fatno,sevkno,plkno,ss,ps,bs,ks)	
+		seccep="01,02,03,04,05,06,07,08,09"
+		xftrseri=left(fatno,2)
+		xftrnum =INT(val(subs(fatno,at(" ",fatno))))
+		xftrno=fatnostr(xftrseri, xftrnum)
 		
 		SELECT ftrrpr
 		SEEK xftrno	
@@ -1197,8 +1205,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 				REPLACE NEXT 1 faturano WITH ftno, eczanekodu WITH ftrrpr->eczanekodu, tarih WITH ftrrpr->tarih
 			ENDIF 
 			REPLACE NEXT 1 sevklistno WITH ftrrpr->sevklistno, sevktarihi WITH DATE(), sevksaati WITH TIME(1),;
-        	kolisay WITH INT(VAL(ALLTRIM(ks))), posetsay WITH INT(VAL(ALLTRIM(ps))),;
-        	buzluksay WITH INT(VAL(ALLTRIM(bs))), sepetsay with INT(VAL(ALLTRIM(ss)))   	
+        	kolisay WITH INT(VAL(ALLTRIM(TRANSFORM(ks)))), posetsay WITH INT(VAL(ALLTRIM(TRANSFORM(ps)))),;
+			buzluksay WITH INT(VAL(ALLTRIM(TRANSFORM(bs)))), sepetsay with INT(VAL(ALLTRIM(TRANSFORM(ss))))  	
         	RETURN "true" 
 		ENDIF
 		RETURN "false" 
