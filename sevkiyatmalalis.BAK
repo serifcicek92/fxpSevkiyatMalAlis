@@ -286,7 +286,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	ENDPROC
 **------------------------------------------------------------------------------------------------------------------------------	
 **Dönüþ Yap
-	PROCEDURE donusYap(plkNo)
+ 		PROCEDURE donusYap(plkNo)
 		this.definePaths()
 		BPATH = this.BPATH
 		STKPATH = this.STKPATH
@@ -1124,7 +1124,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	        ENDIF
 		ENDIF
 		
-		IF lKayitBulundu = .T. then	
+		IF lKayitBulundu = .F. then	
 
 			  SELECT belgeno
 		      loca for belgetipi="SEVKNO"
@@ -1222,35 +1222,38 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		ENDIF
 		RETURN "false" 
 	ENDPROC 
-	
-	Procedure FatnoStr
-		Param psr, pfno
-		return longtotext(pfno)+padr(psr,3)
-	ENDPROC
+	*-------------------------------------------------------------------
+	**Procedure FatnoStr
+		**Param psr, pfno
+		**return longtotext(pfno)+padr(psr,3)
+	**ENDPROC
+	*---------------------------
 	
 	
 	**------------------------------------------------------------------------------------------------------------------------------	
 	** Son faturalarý, þifreli saatleri çözerek ve baðlý sepetlerle birlikte getirir
 	PROCEDURE getSonSevkiyatDetayli(pGeriyeBak)
+		**logYaz("sevklog.txt", " METODA GÝRDÝ")
 	    this.definePaths()
 	    STKPATH = this.STKPATH
-	    
+	     
 	    IF TYPE("pGeriyeBak") != "N" OR pGeriyeBak <= 0
 	        pGeriyeBak = 1000
 	    ENDIF
 
-	    ** Tablolarý aç
+	    ** Tablolary aç
 	    IF FILE(STKPATH+"sepet.dbf")
 	       USE &STKPATH.sepet SHARED IN 0
 	    ELSE
 	       USE &STKPATH.sepetler ALIAS sepet SHARED IN 0
 	    ENDIF
+	    **logYaz("sevklog.txt", TTOC(DATETIME()) + " SEPET AÇILDI" + CHR(13)+CHR(10))
 	    USE &STKPATH.ftrrpr SHARED IN 0
-	    
+	    **logYaz("sevklog.txt", TTOC(DATETIME()) + " FTRRPR AÇILDI - RECCOUNT:" + TRANSFORM(RECCOUNT()) + CHR(13)+CHR(10))    
 	    SELECT ftrrpr
 	    SET ORDER TO 0  
 	    
-	    ** Son kayýtlara zýpla
+	    ** Son kayytlara zypla
 	    IF RECCOUNT() > pGeriyeBak
 	        GO RECCOUNT() - pGeriyeBak
 	    ELSE
@@ -1258,9 +1261,10 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	    ENDIF
 
 	    JSONMetin = "["
-	    
-	    
-	    SCAN REST FOR ALLTRIM(TRANSFORM(ftrrpr.cepno)) == ALLTRIM(TRANSFORM(this._CEPNO))
+	    **logYaz("sevklog.txt", TTOC(DATETIME()) + " SCAN BAÞLIYOR" + CHR(13)+CHR(10))
+	    cCepNo = ALLTRIM(TRANSFORM(this._CEPNO))
+	    SCAN REST FOR ALLTRIM(TRANSFORM(ftrrpr.cepno)) == cCepNo 
+	    	**logYaz("sevklog.txt", TTOC(DATETIME()) + " SCAN ÝÇÝ - faturano:" + TRANSFORM(ftrrpr.faturano) + CHR(13)+CHR(10))
 	    	IF EMPTY(ftrrpr.takipno) OR ISNULL(ftrrpr.takipno)
 	    		LOOP   
 	    	ENDIF
@@ -1283,7 +1287,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	            CONTINUE 
 	        ENDDO 
 
-	        ** Sepeti olmayan faturayý es geç 
+	        ** Sepeti olmayan faturayy es geç 
 	        IF EMPTY(sepetstr)
 	            SELECT ftrrpr
 	            LOOP
@@ -1293,17 +1297,17 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	        sepetstr = LEFT(sepetstr, LEN(sepetstr)-1)
 
 	        SELECT ftrrpr
-	        ** JSON satýrýný oluþtur
+	        ** JSON satyryny olu?tur
 	        lcSatir = "{'subeno':'" + ALLTRIM(TRANSFORM(this._SUBENO)) + "'," + ;
 	                  "'cepno':'" + ALLTRIM(TRANSFORM(ftrrpr.cepno)) + "'," + ;
-	                  "'faturano':'" + ALLTRIM(FatnoCoz(faturano)) + "'," + ;
+	                  "'faturano':'" + ALLTRIM(FatnoCoz(ftrrpr.faturano)) + "'," + ;
 	                  "'takipno':'" + ALLTRIM(cTkpNo) + "'," + ;
 	                  "'ftrtarih':'" + TRANSFORM(ftrrpr.tarih) + "'," + ;
 	                  "'ftrsaati':'" + ctotime(subs(ftrrpr.saati,1,2)) + "'," + ;
 	                  "'sipsaati':'" + ctotime(subs(ftrrpr.saati,4,2)) + "'," + ;
 	                  "'sepetler':[" + sepetstr + "]},"
 	        
-	        ** Olasý enter karakterlerini temizle ve ana metne ekle
+	        ** Olasy enter karakterlerini temizle ve ana metne ekle
 	        JSONMetin = JSONMetin + STRTRAN(STRTRAN(lcSatir, CHR(13), ""), CHR(10), "")
 	    ENDSCAN
 

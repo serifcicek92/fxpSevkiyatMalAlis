@@ -210,9 +210,44 @@ PARAMETERS dosyaadi, yazilacakLog
 	FCLOSE(txtFile)
 	RETURN 
 ENDPROC 
-
+*----------------------------------------------------------------------------------------------
 *----------------------------------------------------------------------------------------------
 Procedure FatnoCoz
+Param pfno
+Private dondgr,kk,nmrc
+
+** KORUMA
+IF TYPE("pfno") != "C" OR EMPTY(ALLTRIM(pfno))
+    RETURN ""
+ENDIF
+
+nmrc=.t.
+do case
+case LEFT(pfno,2)="CF" .and. val(subs(pfno,3))<>0
+  dondgr=val(subs(pfno,3))
+
+otherwise
+  for kk=1 to len(pfno)
+   if .not. subs(pfno,kk,1)$" 0123456789-"
+      nmrc=.f.
+      exit
+   endif
+  next
+  if nmrc
+     dondgr=pfno
+  else
+     ** TexttoLong'a göndermeden önce uzunluk kontrolü
+     IF LEN(pfno) >= 4
+         dondgr=substr(pfno,5,3)+str(TexttoLong(pfno),7)
+     ELSE
+         dondgr=pfno
+     ENDIF
+  endif   
+endcase
+return dondgr
+*----------------------------------------------------------------------------------------------
+
+Procedure FatnoCozEski
 Param pfno
 Private dondgr,kk, nmrc
 nmrc=.t.
@@ -278,7 +313,7 @@ endfor
 NUMS=nums*iif(subs(hexs,1,1)=chr(31),-1,1)
 return nums
 *---------------------------------------------------------------------------------------------
-Procedure sifir
+Procedure sifir2
 PARA num,len,dec
 if type("dec")="N"
    if num=0
@@ -293,7 +328,6 @@ if type("dec")="N"
 else
    retu right(repl("0",len)+ltrim(str(num,len)),len)
 endif 
-
 *---------------------------------------------------------------------------------------------
 
 *----------------------------------------------------------------------------------
@@ -461,7 +495,7 @@ Parameters ptxt
 Return Cpconvert(1254,857,ptxt)
 
 *----------------------------------------------------------------------------------------------
-Procedure LongToText
+Procedure LongToText2
 para nums
 private hexs,ss,CRC,k1
 ss=abs(nums)
@@ -473,7 +507,7 @@ endfor
 hexs=iif(nums<0,chr(31),"")+hexs
 return hexs
 *----------------------------------------------------------------------------------------------
-Procedure TexttoLong
+Procedure TexttoLong2
 para hexs
 PRIVATE K, SS, NUMS
 nums=0
