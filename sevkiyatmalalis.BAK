@@ -2,6 +2,7 @@ SET PROCEDURE TO util.prg, windowslogon.prg
 SET EXCLUSIVE OFF
 **set classlib to myclasslib,_utility
 DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
+**DEFINE CLASS sevkiyatmalalis  AS Session OLEPUBLIC
 	HIDDEN BPATH
 	HIDDEN STKPATH
 	HIDDEN KLASOR
@@ -286,7 +287,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	ENDPROC
 **------------------------------------------------------------------------------------------------------------------------------	
 **Dönüþ Yap
- 		PROCEDURE donusYap(plkNo)
+ 	PROCEDURE donusYap(plkNo)
 		this.definePaths()
 		BPATH = this.BPATH
 		STKPATH = this.STKPATH
@@ -302,6 +303,38 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 			RETURN "false"
 		ENDIF 
 	ENDPROC 
+	
+	PROCEDURE donusYapTest(plkNo)
+	    this.definePaths()
+	    BPATH = this.BPATH
+	    STKPATH = this.STKPATH
+	    USE &STKPATH.sevklist SHARED
+	    SET ORDER TO 3 desc
+	    SEEK plkNo
+
+	    LOCAL lIslemYapildi
+	    lIslemYapildi = .F.
+
+	    * Plaka bulunduðu sürece (WHILE plakano = plkNo) tüm kayýtlarý tara
+	    IF FOUND()
+	        SCAN WHILE plakano = plkNo
+	            * Dönüþ tarihi boþ olan VE sevkiyat tarihi son 2 gün içinde olanlarý bul
+	            IF donustarih < CTOD("1/1/1") .AND. sevktarihi > DATE() - 2
+	                REPLACE donustarih WITH DATE(), donussaati WITH TIME(1)
+	                lIslemYapildi = .T. && En az 1 kayýt güncellendiðini iþaretle
+	            ENDIF
+	        ENDSCAN
+	    ENDIF
+
+	    * Eðer döngü içinde en az 1 kayýt kapatýldýysa true dön
+	    IF lIslemYapildi = .T.
+	        RETURN "true" 
+	    ELSE 
+	        RETURN "false"
+	    ENDIF 
+	ENDPROC
+	
+
 	
 
 **------------------------------------------------------------------------------------------------------------------------------	
@@ -1112,7 +1145,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		lKayitBulundu = .F.
 
 		IF FOUND() then
-			LOCATE REST WHILE plakano = plkNo FOR donustarih < CTOD("1/1/1") .AND. sevktarihi > DATE()-2
+			LOCATE REST WHILE plakano = plkNo FOR donustarih < CTOD("1/1/1") .AND. sevktarihi > DATE()-1
 			**svkno = TRANSFORM(INT(texttolong(sevklistno)))
 			**replace NEXT 1 sevktarihi WITH DATE(),sevksaati WITH TIME(1)
 			**RETURN svkno
@@ -1152,7 +1185,47 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 		RETURN svkno
 	ENDPROC 
 	
+	
+	*--------------------------------------------------------------------------------------------------
+	
 	PROCEDURE UseTables()
+		this.definePaths()
+		STKPATH = this.STKPATH 
+		
+		* 1. Sevklist
+		IF !USED("sevklist")
+			USE (STKPATH + "sevklist") IN 0 SHARED ALIAS sevklist
+		ENDIF
+		
+		* 2. Araclar
+		IF !USED("araclar")
+			USE (STKPATH + "araclar") IN 0 SHARED ALIAS araclar
+			SELECT araclar
+			SET ORDER TO 1
+		ENDIF
+		
+		* 3. Surucu
+		IF !USED("surucu")
+			USE (STKPATH + "surucu") IN 0 SHARED ALIAS surucu
+			SELECT surucu
+			SET ORDER TO 1
+		ENDIF
+		
+		* 4. Ftrrpr
+		IF !USED("ftrrpr")
+			USE (STKPATH + "ftrrpr") IN 0 SHARED ALIAS ftrrpr
+			SELECT ftrrpr
+			SET ORDER TO 1
+		ENDIF
+		
+		* 5. Ftrcikis
+		IF !USED("ftrcikis")
+			USE (STKPATH + "ftrcikis") IN 0 SHARED ALIAS ftrcikis
+		ENDIF
+	ENDPROC
+	
+	*--------------------------------------------------------------------------------------------------
+	PROCEDURE UseTableseski()
 		this.definePaths()
 		STKPATH = this.STKPATH 
 		
@@ -1213,7 +1286,7 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 			LOCATE WHILE faturano=xftrno  FOR eczanekodu = ftrrpr.eczanekodu.and.tarih=ftrrpr.tarih 
 			IF !FOUND()
 				APPEND BLANK
-				REPLACE NEXT 1 faturano WITH ftno, eczanekodu WITH ftrrpr->eczanekodu, tarih WITH ftrrpr->tarih
+				REPLACE NEXT 1 faturano WITH fatno, eczanekodu WITH ftrrpr->eczanekodu, tarih WITH ftrrpr->tarih
 			ENDIF 
 			REPLACE NEXT 1 sevklistno WITH ftrrpr->sevklistno, sevktarihi WITH DATE(), sevksaati WITH TIME(1),;
         	kolisay WITH INT(VAL(ALLTRIM(TRANSFORM(ks)))), posetsay WITH INT(VAL(ALLTRIM(TRANSFORM(ps)))),;
@@ -1275,8 +1348,8 @@ DEFINE CLASS sevkiyatmalalis  AS Custom OLEPUBLIC
 	       
 	        sepetstr = ""
 	        SELECT sepet
-	        SET ORDER TO 0
-	        GO TOP
+	        **SET ORDER TO 0
+	        **GO TOP
 	      
 	        LOCATE FOR takipno == cTkpNo .AND. eczanekodu == cEczKodu
 	        
