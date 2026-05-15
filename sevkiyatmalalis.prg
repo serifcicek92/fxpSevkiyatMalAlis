@@ -197,6 +197,106 @@ DEFINE CLASS sevkiyatmalalis  AS Session OLEPUBLIC
 **------------------------------------------------------------------------------------------------------------------------------	
 	
 	PROCEDURE okunanBilgiGetir(okunanTakipNo,okunanTarihg,okunanBolgeNo)
+	    LOCAL JSONmetin, ftno, ftnovar, slistno, sepetstr
+	    JSONmetin = "[]"
+	    
+	    SELECT ftrrpr
+	    
+	    IF ftrrpr.bolge $ okunanBolgeNo THEN 
+	        ftnovar = (TYPE("ftrrpr->faturano")="C")
+	        ftno = iif(ftnovar, ftrrpr->faturano, STR(ftrrpr->no1,7))
+	        
+	        ** 1. ADIM: Eczane bilgisi (SEEK zaten hýzlýdýr)
+	        SELECT c100
+	        SET ORDER TO 1
+	        IF SEEK(ftrrpr.eczanekodu)
+	            JSONmetin = "[{" 
+	            
+	            ** 2. ADIM: Fatura Çýkýþ Bilgisi (LOCATE yerine SEEK + SCAN)
+	            SELECT ftrcikis
+	            SET ORDER TO 1 && FaturaNo indeksi
+	            
+	            ** SEEK ile kaydýn baþýna git, SCAN WHILE ile sadece o faturada dön
+	            IF SEEK(ftno)
+	                SCAN WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu = ftrrpr.eczanekodu
+	                    ** Veri bulunduysa döngüden hemen çýk (Tek kayýt yeterli varsayýyoruz)
+	                    EXIT 
+	                ENDSCAN
+	            ENDIF
+
+	            IF EMPTY(sevksaati) .and. FOUND() THEN 
+	                JSONmetin = JSONmetin + "'ftrrec':'" + ALLTRIM(STR(RECNO("ftrrpr"))) + "'," + ;
+	                            "'hesapkodu':'" + ftrrpr.eczanekodu + "'," + ;
+	                            "'adi':'" + ALLTRIM(CPCONVERT(857,1254,c100.adi)) + "'," + ;
+	                            "'kolisay':'" + LTRIM(STR(ftrcikis.kolisay)) + "'," + ;
+	                            "'posetsay':'" + LTRIM(STR(ftrcikis.posetsay)) + "'," + ;
+	                            "'buzluksay':'" + LTRIM(STR(ftrcikis.buzluksay)) + "'," + ;
+	                            "'sepetsay':'" + LTRIM(STR(ftrcikis.sepetsay)) + "',"
+	            ELSE
+	                JSONmetin = JSONmetin + "'ftrrec':'" + TRANSFORM(RECNO("ftrrpr")) + "'," + ;
+	                            "'hesapkodu':'" + ftrrpr.eczanekodu + "'," + ;
+	                            "'adi':'" + ALLTRIM(CPCONVERT(857,1254,c100.adi)) + "',"
+	                
+	                SET DELETED OFF 
+	                SELECT irsrpr
+	                IF TYPE("sepetirsrecno") != "U" .AND. sepetirsrecno > 0 .AND. sepetirsrecno <= RECCOUNT() THEN 
+	                    GO sepetirsrecno
+	                    JSONmetin = JSONmetin + "'kolisay':'" + LTRIM(STR(irsrpr.kolisay)) + "'," + ;
+	                                "'posetsay':'" + LTRIM(STR(irsrpr.posetsay)) + "'," + ;
+	                                "'buzluksay':'" + LTRIM(STR(irsrpr.buzluksay)) + "'," + ;
+	                                "'sepetsay':'" + LTRIM(STR(irsrpr.sepetsayi)) + "',"
+	                ELSE 
+	                    JSONmetin = JSONmetin + "'kolisay':'0','posetsay':'0','buzluksay':'0','sepetsay':'0',"
+	                ENDIF
+	                SET DELETED ON
+	            ENDIF 
+
+	            ** Geri kalan ortak alanlar (String birleþtirmeyi gruplayarak hýzý artýrýyoruz)
+	            JSONmetin = JSONmetin + "'cepno':'" + ALLTRIM(ftrrpr.cepno) + "'," + ;
+	                        "'semt':'" + ALLTRIM(CPCONVERT(857,1254,c100.semt)) + "'," + ;
+	                        "'sehir':'" + ALLTRIM(CPCONVERT(857,1254,c100.sehir)) + "'," + ;
+	                        "'bolge':'" + c100.bolge + "'," + ;
+	                        "'faturano':'" + FatnoCoz(ftno) + "'," + ;
+	                        "'takipno':'" + ftrrpr.takipno + "',"
+	            
+	            slistno = TRANSFORM(IIF(TRIM(ftrrpr.sevklistno)=="", "", TexttoLong(ftrrpr.sevklistno)))
+	            JSONmetin = JSONmetin + "'sevklistno':'" + slistno + "'," + ;
+	                        "'sevksekli':'" + ftrrpr.sevksekli + "'," + ;
+	                        "'ftrsaati':'" + ctotime(subs(ftrrpr.saati,1,2)) + "'," + ;            
+	                        "'sipsaati':'" + ctotime(subs(ftrrpr.saati,4,2)) + "'," + ;
+	                        "'ftrtarih':'" + DTOC(ftrrpr.tarih) + "',"
+	                        **"'ftrsaati':'" + ALLTRIM(subs(ftrrpr.saati,1,2)) + ":00'," + ;
+	                        **"'sipsaati':'" + ALLTRIM(subs(ftrrpr.saati,4,2)) + ":00'," + ;
+	                        
+
+	            ** 3. ADIM: SEPETLERÝ GETÝR (DO WHILE yerine SCAN WHILE)
+	            sepetstr = ""
+	            SELECT sepet
+	            ** Eðer sepet tablosunda TAKIPNO indeksi varsa itakipno TAG'ini seçin. 
+	            ** Yoksa bu LOCATE mecburen yavaþ kalacaktýr.
+	            LOCATE FOR takipno = ftrrpr.takipno .and. eczanekodu = ftrrpr.eczanekodu
+	            
+	            ** SCAN WHILE mantýðý burada CONTINUE yükünü kaldýrýr
+	            DO WHILE FOUND()
+	                IF kapak $ "123K"
+	                    sepetstr = sepetstr + ALLTRIM(sepetkodu) + ","
+	                ENDIF
+	                CONTINUE 
+	            ENDDO 
+	            
+	            IF LEN(sepetstr) > 0
+	                sepetstr = LEFT(sepetstr, LEN(sepetstr) - 1)
+	            ENDIF
+	            
+	            JSONmetin = JSONmetin + "'sepetler':'" + ALLTRIM(sepetstr) + "'}]"
+	            SELECT ftrrpr
+	        ENDIF 
+	    ENDIF 
+	    
+	    RETURN JSONmetin
+	ENDPROC
+	
+	PROCEDURE okunanBilgiGetirEski(okunanTakipNo,okunanTarihg,okunanBolgeNo)
 			LOCAL JSONmetin, ftno, ftnovar, slistno, sepetstr
 			JSONmetin = "[]" && Baþlangýçta geçerli bir boþ dizi
 			
@@ -217,6 +317,7 @@ DEFINE CLASS sevkiyatmalalis  AS Session OLEPUBLIC
 						SET ORDER TO 1
 						SEEK ftno
 						LOCATE WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu = ftrrpr.eczanekodu
+						**SCAN WHILE faturano = ftno FOR tarih = ftrrpr.tarih .and. eczanekodu = ftrrpr.eczanekodu
 						
 						** Bilgileri doldurma (Ortak kýsýmlarý dýþarýda toplamak daha temiz olur ama yapýný koruyorum)
 						IF EMPTY(sevksaati) .and. FOUND() THEN 
@@ -517,7 +618,7 @@ DEFINE CLASS sevkiyatmalalis  AS Session OLEPUBLIC
 		ENDIF 
 		
 		SET TABLEVALIDATE to 0
-		USE &STKPATH.ftrcikis
+		USE &STKPATH.ftrcikis SHARED
 		SET ORDER TO 1
 		SELECT 0
 		
@@ -680,9 +781,9 @@ DEFINE CLASS sevkiyatmalalis  AS Session OLEPUBLIC
 				
 				wlogout()
                **RETURN yazz
-               IF LEN(JSONdon)>0 THEN 
-               	logYaz("sevktest.txt",JSONdon)
-               ENDIF 
+               **IF LEN(JSONdon)>0 THEN 
+               	**logYaz("sevktest.txt",JSONdon)
+               **ENDIF 
                RETURN JSONdon
             ELSE 
             	SET DELETED off
